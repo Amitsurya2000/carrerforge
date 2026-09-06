@@ -1237,9 +1237,12 @@ async function initAuth(){
   if(error){showAuthError("Could not start Google sign-in: "+error.message);b.disabled=false;b.querySelector("span").textContent="Continue with Google";}
 }
 async function applyAuth(){
-  if(!sbc){ // auth not configured / config fetch failed -> allow the app, hide the gate
-    const ov=$("authOverlay");if(ov)ov.classList.add("hidden");
-    return false;
+  const deployed = window.location.hostname && window.location.hostname!=="localhost" && !window.location.hostname.startsWith("127.");
+  if(!sbc){
+    // auth broken/unconfigured: block hard on a deployed site, open only for local dev
+    const ov=$("authOverlay");if(!ov)return false;
+    if(deployed){showAuthError("Sign-in is not configured. Ask the developer to set SUPABASE_URL + SUPABASE_ANON_KEY on the server.");ov.classList.remove("hidden");return false;}
+    ov.classList.add("hidden");return true;
   }
   const { data:{ session } }=await sbc.auth.getSession();
   if(!session){
@@ -1251,6 +1254,7 @@ async function applyAuth(){
   const emailEl=$("authEmail");if(emailEl)emailEl.textContent=session.user.email||"";
   $("signOutBtn").onclick=async()=>{await sbc.auth.signOut();};
   $("authOverlay").classList.add("hidden");
+  document.body.style.overflow="";
   return true;
 }
 async function attachToken(){
@@ -1274,7 +1278,8 @@ async function boot(){
   try{privateAuth=await (await fetch("/api/auth-config")).json();}catch(e){}
   sbc=supabaseClient();
   try{await attachToken();}catch(e){}
-  await applyAuth();
+  const authed=await applyAuth();
+  if(!authed){document.body.style.overflow="hidden";return;} // never render the app until signed in
   loadWS();buildNav();
   const h=location.hash.slice(1);go(h&&(h==="home"||SG[h]||T[h])?h:"home");
   lucide.createIcons();
