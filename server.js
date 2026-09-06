@@ -214,8 +214,16 @@ function run(cmd, args) {
   );
 }
 
-const REPORTS_DIR = path.join(__dirname, "public", "reports");
-fs.mkdirSync(REPORTS_DIR, { recursive: true });
+// Generated deliverables live here. On Vercel the function filesystem is
+// read-only except /tmp, so use /tmp and serve it ourselves. Locally we keep
+// them under public/reports (gitignored).
+const REPORTS_DIR =
+  process.env.VERCEL
+    ? path.join(os.tmpdir(), "reports")
+    : (() => { const d = path.join(__dirname, "public", "reports"); fs.mkdirSync(d, { recursive: true }); return d; })();
+
+// On Vercel /tmp/reports is not part of the static bundle, so serve it here.
+app.use("/reports", express.static(REPORTS_DIR));
 
 // Forgiving JSON extraction: strip fences, then take the outermost {...}
 function safeJson(raw) {
