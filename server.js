@@ -76,14 +76,14 @@ const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
 const DEEPSEEK_BASE = process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com/v1";
 const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || "deepseek-v4-flash";
 
-// ---------------- LLM call (DeepSeek primary, Gemini fallback) ----------------
+// ---------------- LLM call (Gemini primary, DeepSeek fallback) ----------------
 // Named callGemini for backward-compatibility with existing callers.
 // opts.json = true asks the model for guaranteed-valid JSON (used by all
 // JSON-producing modules so a stray quote/newline can never break parsing).
 async function callGemini(prompt, opts = {}) {
-  if (DEEPSEEK_API_KEY) return callDeepSeek(prompt, opts);
   if (API_KEY) return callGeminiNative(prompt, opts);
-  throw new Error("No DEEPSEEK_API_KEY or GEMINI_API_KEY set in .env");
+  if (DEEPSEEK_API_KEY) return callDeepSeek(prompt, opts);
+  throw new Error("No GEMINI_API_KEY or DEEPSEEK_API_KEY set in .env");
 }
 
 async function callDeepSeek(prompt, opts = {}) {
