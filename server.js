@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { createClient } from "@supabase/supabase-js";
 import express from "express";
 import multer from "multer";
 import path from "path";
@@ -18,6 +19,57 @@ app.use(express.static(path.join(__dirname, "public")));
 const API_KEY = process.env.GEMINI_API_KEY;
 const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 const PORT = process.env.PORT || 3080;
+
+// ---------------- Supabase (customer data) ----------------
+// Lazy client: only created when the env vars are present (local dev without
+// Supabase should still boot). Never expose the service-role key to the client.
+function supabase() {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  return createClient(url, key, { auth: { persistSession: false } });
+}
+
+app.post("/api/customers", async (req, res) => {
+  try {
+    const db = supabase();
+    if (!db) return res.status(500).json({ error: "Supabase is not configured (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY missing)." });
+    const { name, email, phone, years, targetSalary, dreamCompanies, extra, resume, job } = req.body || {};
+    if (!email) return res.status(400).json({ error: "Email is required." });
+    const { data, error } = await db
+      .from("customers")
+      .upsert({
+        email: String(email).toLowerCase().trim(),
+        name: name || null,
+        phone: phone || null,
+        years: years || null,
+        target_salary: targetSalary || null,
+        dream_companies: dreamCompanies || null,
+        extra: extra || null,
+        resume: resume || null,
+        job: job || null,
+        last_seen_at: new Date().toISOString(),
+      }, { onConflict: "email" })
+      .select()
+      .single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ ok: true, customer: data });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get("/api/customers", async (_req, res) => {
+  try {
+    const db = supabase();
+    if (!db) return res.status(500).json({ error: "Supabase is not configured." });
+    const { data, error } = await db.from("customers").select("*").order("created_at", { ascending: false }).limit(500);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ customers: data });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 // DeepSeek (OpenAI-compatible) config — used as the primary brain when set.
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
@@ -447,8 +499,13 @@ app.get("/api/modules", (_req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`\n  🚀 One-Room Career Suite running`);
-  console.log(`  → Open http://localhost:${PORT} in your browser`);
-  console.log(`  → Model: ${MODEL}\n`);
-});
+// Vercel imports the Express app instead of running it as a standalone server.
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`\n  🚀 One-Room Career Suite running`);
+    console.log(`  → Open http://localhost:${PORT} in your browser`);
+    console.log(`  → Model: ${MODEL}\n`);
+  });
+}
+
+export default app;

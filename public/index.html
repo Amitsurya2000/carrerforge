@@ -1178,7 +1178,7 @@ function closeDrawer(){$("scrim").classList.remove("open");$("drawer").classList
 $("setupBtn").onclick=openDrawer;$("closeDrawer").onclick=closeDrawer;$("scrim").onclick=closeDrawer;
 $("hamb").onclick=()=>document.body.classList.toggle("nav-open");
 $("sidescrim").onclick=()=>document.body.classList.remove("nav-open");
-$("saveBtn").onclick=()=>{saveWS();$("savedMsg").classList.add("show");setTimeout(()=>$("savedMsg").classList.remove("show"),1600);closeDrawer();render();};
+$("saveBtn").onclick=()=>{saveWS();try{const p=gather();fetch("/api/customers",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...p.profile,resume:p.resume,job:p.job})}).catch(()=>{});}catch(e){};$("savedMsg").classList.add("show");setTimeout(()=>$("savedMsg").classList.remove("show"),1600);closeDrawer();render();};
 $("file").addEventListener("change",async e=>{const f=e.target.files[0];if(!f)return;
   $("filestatus").textContent="Reading "+f.name+"…";const fd=new FormData();fd.append("file",f);
   try{const r=await fetch("/api/parse-resume",{method:"POST",body:fd});const d=await r.json();
