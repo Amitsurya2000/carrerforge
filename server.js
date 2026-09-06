@@ -71,6 +71,41 @@ app.get("/api/customers", async (_req, res) => {
   }
 });
 
+// ---------------- Auth (Supabase, Gmail/Google) ----------------
+// Public: hands the anon (publishable) URL+key to the browser so it can run the
+// Supabase Auth client. The anon key is safe for clients by design.
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+app.get("/api/auth-config", (_req, res) => {
+  res.json({
+    url: process.env.SUPABASE_URL || "",
+    anonKey: SUPABASE_ANON_KEY || "",
+    enabled: !!(process.env.SUPABASE_URL && SUPABASE_ANON_KEY),
+  });
+});
+
+// Verifies the Supabase JWT ("Authorization: Bearer <token>") for every other /api route.
+async function requireAuth(req, res, next) {
+  // If auth isn't configured (local dev), allow — the app degrades gracefully.
+  if (!process.env.SUPABASE_URL || !SUPABASE_ANON_KEY) return next();
+  const h = req.headers.authorization || "";
+  const token = h.startsWith("Bearer ") ? h.slice(7) : null;
+  if (!token) return res.status(401).json({ error: "Not signed in." });
+  try {
+    const verifier = createClient(process.env.SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+    const { data: { user }, error } = await verifier.auth.getUser(token);
+    if (error || !user) return res.status(401).json({ error: "Invalid or expired session." });
+    req.user = user;
+    next();
+  } catch (e) {
+    res.status(401).json({ error: "Invalid token: " + e.message });
+  }
+}
+const PUBLIC_API = new Set(["/api/auth-config", "/api/banner-templates"]);
+app.use("/api", (req, res, next) => {
+  if (PUBLIC_API.has(req.path)) return next();
+  return requireAuth(req, res, next);
+});
+
 // DeepSeek (OpenAI-compatible) config — used as the primary brain when set.
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
 const DEEPSEEK_BASE = process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com/v1";

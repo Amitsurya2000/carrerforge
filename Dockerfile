@@ -1,5 +1,9 @@
 # CareerForge — Node app that shells out to headless Chromium + Python (stdlib only)
 # for the banner images and designed PDFs. This image bundles all three.
+#
+# Env vars to pass at runtime (see .env.example):
+#   GEMINI_API_KEY                 (REQUIRED — primary LLM brain)
+#   SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY  (auth + customer storage)
 FROM node:20-slim
 
 ENV NODE_ENV=production \

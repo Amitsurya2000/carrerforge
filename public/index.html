@@ -10,6 +10,7 @@
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{
   --bg:#08080A; --surface:#0E0E11; --surface-hi:#14141A;
@@ -294,9 +295,37 @@ body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opa
 .swatch.sel{border-color:#fff;box-shadow:0 0 0 3px rgba(255,255,255,.25)}
 .colortext{flex:1;min-width:200px;background:var(--surface-hi);border:1px solid var(--line);color:#fff;border-radius:10px;padding:9px 12px;font-size:13px}
 .colortext:focus{outline:none;border-color:var(--red)}
+.auth-overlay{position:fixed;inset:0;z-index:300;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px}
+.auth-card{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:40px 32px;text-align:center;box-shadow:var(--depth-1);animation:authin .35s var(--ease)}
+@keyframes authin{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.auth-mark{width:56px;height:56px;border-radius:16px;background:var(--red-grad);display:flex;align-items:center;justify-content:center;margin:0 auto 18px;box-shadow:var(--glow)}
+.auth-mark i{width:26px;height:26px;color:#fff}
+.auth-name{font-family:var(--font-display);font-size:22px;font-weight:800;letter-spacing:-.02em}
+.auth-sub{color:var(--t3);font-size:13px;margin:8px 0 26px}
+.auth-error{background:rgba(237,56,59,.12);color:#ff9a9b;border:1px solid rgba(237,56,59,.3);padding:10px 12px;border-radius:10px;font-size:12.5px;margin-bottom:16px}
+.auth-google{width:100%;height:46px;border-radius:12px;border:1px solid var(--line);background:var(--surface-hi);color:var(--ink);font-family:var(--font-body);font-size:14.5px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer;transition:.15s}
+.auth-google:hover{background:#1e1e26;border-color:rgba(255,255,255,.28)}
+.auth-google:disabled{opacity:.6;cursor:default}
+.auth-hint{color:var(--t4);font-size:12px;margin-top:18px}
+.auth-overlay.hidden{display:none}
 </style>
 </head>
 <body>
+<!-- LOGIN OVERLAY -->
+<div class="auth-overlay" id="authOverlay">
+  <div class="auth-card">
+    <div class="auth-mark"><i data-lucide="rocket"></i></div>
+    <div class="auth-name">CareerForge</div>
+    <div class="auth-sub">Sign in to continue to your Career OS</div>
+    <div id="authError" class="auth-error" style="display:none"></div>
+    <button class="auth-google" id="googleBtn">
+      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.3 6.1 29.5 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.6-.4-3.9z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.3 6.1 29.5 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.3c-2 1.5-4.5 2.5-7.2 2.5-4.8 0-9-3.3-10.3-7.8l-6.4 4.9C10.2 39.7 16.5 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.1 5.7l6.2 5.3C36.9 39.2 44 34 44 24c0-1.3-.1-2.6-.4-3.9z"/></svg>
+      <span>Continue with Google</span>
+    </button>
+    <div class="auth-hint">or any email via Gmail</div>
+  </div>
+</div>
+
 <div class="app">
   <!-- SIDEBAR -->
   <aside class="side">
@@ -309,6 +338,8 @@ body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opa
       <div class="planbox">
         <div class="p1"><span class="pill">PRO</span> Rajat's Workspace</div>
         <div class="p2">Full suite unlocked · ₹1 Cr benchmark engine</div>
+        <div class="p2" id="authEmail" style="margin-top:6px;opacity:.75"></div>
+        <button class="btn btn-ghost" id="signOutBtn" style="width:100%;margin-top:10px"><i data-lucide="log-out"></i> <span class="lbl">Sign out</span></button>
       </div>
     </div>
   </aside>
@@ -1190,9 +1221,65 @@ FIELDS.forEach(f=>$(f)&&$(f).addEventListener("input",()=>{clearTimeout(window._
 /* ---------- boot ---------- */
 // swap the product name in one place (config constant)
 try{document.querySelector('.brand .name').textContent=APP_NAME;document.title=APP_NAME+" — 1CR Career OS";}catch(e){}
-loadWS();buildNav();
-{const h=location.hash.slice(1);go(h&&(h==="home"||SG[h]||T[h])?h:"home");}
-lucide.createIcons();
+
+/* ---------- Gmail (Supabase Auth) gate ---------- */
+// privateAuth is fetched from /api/auth-config (serves URL + anon/publishable key — safe for browsers).
+let privateAuth=null;let sbc=null;
+function supabaseClient(){
+  if(!privateAuth)return null;
+  try{return window.supabase.createClient(privateAuth.url, privateAuth.anonKey,{auth:{persistSession:true,autoRefreshToken:true}});}catch(e){return null;}
+}
+function showAuthError(m){const el=$("authError");if(!el)return;el.textContent=m;el.style.display="block";}
+async function initAuth(){
+  if(!sbc){showAuthError("Auth is not configured. Ask the developer to set SUPABASE_URL + SUPABASE_ANON_KEY.");return;}
+  const b=$("googleBtn");b.disabled=true;b.querySelector("span").textContent="Redirecting to Google…";
+  const { error }=await sbc.auth.signInWithOAuth({provider:"google",options:{redirectTo:window.location.origin}});
+  if(error){showAuthError("Could not start Google sign-in: "+error.message);b.disabled=false;b.querySelector("span").textContent="Continue with Google";}
+}
+async function applyAuth(){
+  if(!sbc){ // auth not configured / config fetch failed -> allow the app, hide the gate
+    const ov=$("authOverlay");if(ov)ov.classList.add("hidden");
+    return false;
+  }
+  const { data:{ session } }=await sbc.auth.getSession();
+  if(!session){
+    $("authOverlay").classList.remove("hidden");
+    document.body.style.overflow="hidden";
+    return false;
+  }
+  sbc.auth.onAuthStateChange((event,ses)=>{ if(event==="SIGNED_OUT"){location.reload();} });
+  const emailEl=$("authEmail");if(emailEl)emailEl.textContent=session.user.email||"";
+  $("signOutBtn").onclick=async()=>{await sbc.auth.signOut();};
+  $("authOverlay").classList.add("hidden");
+  return true;
+}
+async function attachToken(){
+  if(!sbc)return;
+  const { data:{ session } }=await sbc.auth.getSession();
+  if(!session)return;
+  const tok=session.access_token;
+  const wrap=fetch.bind(window);
+  window.fetch=(...a)=>{
+    let out=a;
+    if(typeof a[0]==="string"&&a[0].startsWith("/api/")){
+      const init=(a[1]||{});
+      init.headers=Object.assign({Authorization:"Bearer "+tok},init.headers||{});
+      out=[a[0],init];
+    }
+    return wrap(...out);
+  };
+}
+$("googleBtn").onclick=initAuth;
+async function boot(){
+  try{privateAuth=await (await fetch("/api/auth-config")).json();}catch(e){}
+  sbc=supabaseClient();
+  try{await attachToken();}catch(e){}
+  await applyAuth();
+  loadWS();buildNav();
+  const h=location.hash.slice(1);go(h&&(h==="home"||SG[h]||T[h])?h:"home");
+  lucide.createIcons();
+}
+boot();
 </script>
 </body>
 </html>
